@@ -194,11 +194,11 @@ resource "azurerm_automation_job_schedule" "daily_runbook" {
   runbook_name            = azurerm_automation_runbook.this.name
   schedule_name           = azurerm_automation_schedule.daily.name
   parameters = {
-    DcrEndpoint          = azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
-    DcrImmutableId       = azurerm_monitor_data_collection_rule.this.immutable_id
-    DcrStreamName        = local.stream_name
-    DcrTableName         = local.table_name
-    TenantId             = data.azurerm_client_config.current.tenant_id
-    WarningThresholdDays = tostring(var.warning_threshold_days)
+    dcrendpoint          = azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
+    dcrimmutableid       = azurerm_monitor_data_collection_rule.this.immutable_id
+    dcrstreamname        = local.stream_name
+    dcrtablename         = local.table_name
+    tenantid             = data.azurerm_client_config.current.tenant_id
+    warningthresholddays = tostring(var.warning_threshold_days)
   }
 }
