@@ -33,6 +33,13 @@ required Microsoft Graph application permission, and assigns it
 **Monitoring Metrics Publisher** on the DCR. The runbook explicitly requests
 tokens for that identity.
 
+The identity is intentionally not assigned Microsoft Entra directory roles such
+as **Cloud Application Administrator**, **Reports Reader**, or Global
+Administrator. Those roles are not required for this read-only inventory.
+`Application.Read.All` is the Microsoft Graph application permission used to
+read application and password-credential metadata, and `Monitoring Metrics
+Publisher` is the only Azure RBAC role needed for log ingestion.
+
 The exact resource names and input variable names are deployment-specific.
 Inspect `terraform/variables.tf` and `terraform/outputs.tf` for the complete list.
 
@@ -110,6 +117,19 @@ After deployment, verify that:
 * the required Microsoft Graph application permission has admin consent;
 * the identity has the DCR ingestion role; and
 * the runbook can obtain tokens without a client secret.
+
+The UAMI should have no Microsoft Entra directory-role assignments. To inspect
+its direct directory roles, use:
+
+```bash
+az rest --method get \
+  --url "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments" |
+  jq '[.value[] | select(.principalId == "<UAMI_PRINCIPAL_ID>")]'
+```
+
+An empty result is expected. Directory roles shown for the signed-in
+administrator or another service principal do not apply to the Automation
+identity.
 
 The scheduled job receives its DCR endpoint, DCR immutable ID, tenant ID, and
 warning threshold through Terraform-rendered runbook defaults. This avoids an

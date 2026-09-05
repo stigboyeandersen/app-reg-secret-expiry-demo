@@ -73,6 +73,9 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
   `e4c79aea-8bdc-49c0-82ec-f43f3dc63108`.
 - The Automation runbook is `Published`; the schedule runs daily in UTC.
 - The Automation identity has `Monitoring Metrics Publisher` on the DCR.
+- The UAMI has no direct Microsoft Entra directory-role assignments; its only
+  directory permission is the Microsoft Graph `Application.Read.All`
+  application role assignment.
 - Microsoft Graph admin consent for the Automation identity remains a required manual tenant-administrator step before the first successful collection run.
 
 ## Diagnostics Update
