@@ -24,16 +24,24 @@ function Get-RequiredValue {
 
 function Get-ManagedIdentityToken {
     param([string]$Resource, [string]$ClientId)
+    $identityEndpoint = $env:IDENTITY_ENDPOINT
+    $identityHeader = $env:IDENTITY_HEADER
     $query = @{
-        'api-version' = '2018-02-01'
+        'api-version' = if ($identityEndpoint) { '2019-08-01' } else { '2018-02-01' }
         resource = $Resource
     }
     if (-not [string]::IsNullOrWhiteSpace($ClientId)) { $query.client_id = $ClientId }
-    $uri = 'http://169.254.169.254/metadata/identity/oauth2/token?' +
+    $uri = if ($identityEndpoint) { $identityEndpoint } else { 'http://169.254.169.254/metadata/identity/oauth2/token' }
+    $uri += '?' +
         (($query.GetEnumerator() | ForEach-Object {
             '{0}={1}' -f [uri]::EscapeDataString([string]$_.Key), [uri]::EscapeDataString([string]$_.Value)
         }) -join '&')
-    $response = Invoke-RestMethod -Method Get -Uri $uri -Headers @{ Metadata = 'true' } -ContentType 'application/json'
+    $headers = if ($identityEndpoint) {
+        @{ 'X-IDENTITY-HEADER' = $identityHeader }
+    } else {
+        @{ Metadata = 'true' }
+    }
+    $response = Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ContentType 'application/json'
     if ([string]::IsNullOrWhiteSpace($response.access_token)) { throw "Managed identity returned no token for $Resource." }
     [string]$response.access_token
 }
@@ -76,7 +84,7 @@ $DcrImmutableId = Get-RequiredValue 'DcrImmutableId' $DcrImmutableId
 $TenantId = Get-RequiredValue 'TenantId' $TenantId
 
 try {
-    $graphToken = Get-ManagedIdentityToken 'https://graph.microsoft.com/.default' $ManagedIdentityClientId
+    $graphToken = Get-ManagedIdentityToken 'https://graph.microsoft.com/' $ManagedIdentityClientId
     $applications = Get-GraphApplications $graphToken
     $nowUtc = [DateTime]::UtcNow
     $records = foreach ($application in $applications) {
@@ -105,7 +113,7 @@ try {
     } else {
         '{0}/dataCollectionRules/{1}/streams/{2}?api-version=2023-01-01' -f $DcrEndpoint.TrimEnd('/'), [uri]::EscapeDataString($DcrImmutableId), [uri]::EscapeDataString($DcrStreamName)
     }
-    $ingestionToken = Get-ManagedIdentityToken 'https://monitor.azure.com/.default' $ManagedIdentityClientId
+    $ingestionToken = Get-ManagedIdentityToken 'https://monitor.azure.com/' $ManagedIdentityClientId
     $body = ConvertTo-Json -InputObject @($records) -Depth 8 -Compress
     $ingestionHeaders = @{ Authorization = 'Bearer ' + $ingestionToken }
     Invoke-WithRetry -Description 'Logs Ingestion API request' -Operation {

@@ -155,6 +155,28 @@ resource "azurerm_automation_account" "this" {
   tags = var.tags
 }
 
+resource "azurerm_monitor_diagnostic_setting" "automation_account" {
+  name                       = "${var.name_prefix}-automation-diagnostics"
+  target_resource_id         = azurerm_automation_account.this.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+
+  enabled_log {
+    category = "JobLogs"
+  }
+
+  enabled_log {
+    category = "JobStreams"
+  }
+
+  enabled_log {
+    category = "AuditEvent"
+  }
+
+  enabled_metric {
+    category = "AllMetrics"
+  }
+}
+
 resource "azurerm_automation_runbook" "this" {
   name                    = "AppRegistrationSecretExpiry"
   location                = azurerm_resource_group.this.location

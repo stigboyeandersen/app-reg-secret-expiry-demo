@@ -138,6 +138,11 @@ eventual consistency in Graph and Log Analytics ingestion. A failed job should b
 retried after checking the job output and permissions; it does not rotate or
 disable credentials.
 
+The Automation Account diagnostic setting sends `JobLogs`, `JobStreams`,
+`AuditEvent`, and `AllMetrics` to the same Log Analytics Workspace. This provides
+the execution evidence needed to confirm that scheduled jobs start, finish, and
+report errors.
+
 Certificates are **out of scope**. This demo does not inventory certificate
 credentials, validate certificate chains, or alert on certificate expiration.
 Alert rules, action groups, notifications, ticketing, and remediation are also
@@ -201,6 +206,31 @@ Collection health by run:
 ```
 
 KQL queries do not reveal secret values because the runbook never sends them.
+
+Automation job errors and streams:
+
+```kusto
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.AUTOMATION"
+| where Resource has "appregexpiry-aa"
+| where Category in ("JobLogs", "JobStreams")
+| where TimeGenerated > ago(7d)
+| project TimeGenerated, Category, RunbookName_s, JobId_g,
+          ResultType, ResultDescription, StreamType_s, _ResourceId
+| order by TimeGenerated desc
+```
+
+Confirm that the scheduled runbook is executing:
+
+```kusto
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.AUTOMATION"
+| where Resource has "appregexpiry-aa"
+| where Category == "JobLogs"
+| where TimeGenerated > ago(7d)
+| summarize Jobs=dcount(JobId_g), LastJob=max(TimeGenerated)
+    by RunbookName_s
+```
 
 ## Verification
 
@@ -274,6 +304,12 @@ has completed.
 DCR endpoint and immutable ID, DCR stream mapping, and the managed identity's
 Azure Monitor ingestion role. Verify that the workspace and DCR are in the
 expected tenant/subscription.
+
+**The runbook returns `Unable to connect to the remote server` while obtaining a
+token.** The runbook supports the Azure Automation managed-identity endpoint
+(`IDENTITY_ENDPOINT`/`IDENTITY_HEADER`) and the IMDS fallback. Confirm the
+Automation Account identity is enabled and retry after the identity has
+propagated.
 
 **The custom table is empty.** Confirm the job completed, inspect job output for
 the record count, wait for ingestion, and query the exact deployed table name.

@@ -71,3 +71,13 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
 - The Automation runbook is `Published`; the schedule runs daily in UTC.
 - The Automation identity has `Monitoring Metrics Publisher` on the DCR.
 - Microsoft Graph admin consent for the Automation identity remains a required manual tenant-administrator step before the first successful collection run.
+
+## Diagnostics Update
+
+- Automation diagnostic setting: `appregexpiry-automation-diagnostics`
+- Destination: `appregexpiry-law`
+- Enabled categories: `JobLogs`, `JobStreams`, `AuditEvent`, and `AllMetrics`
+- A test job reached `Running` and then failed with the expected `403 Forbidden`
+  from Microsoft Graph because tenant-admin consent has not yet been granted.
+- The managed identity token acquisition path is working; the remaining blocker
+  is Graph application permission/admin consent.
