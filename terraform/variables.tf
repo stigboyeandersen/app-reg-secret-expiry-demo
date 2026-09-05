@@ -49,7 +49,7 @@ variable "runbook_path" {
 variable "runbook_publish_uri" {
   description = "A publicly reachable URI accepted by the Automation API as the runbook publish content link."
   type        = string
-  default     = "https://raw.githubusercontent.com/Azure/azure-quickstart-templates/main/quickstarts/microsoft.automation/automation-account-runbook/README.md"
+  default     = "https://raw.githubusercontent.com/stigboyeandersen/app-reg-secret-expiry-demo/main/terraform/scripts/app-registration-secret-expiry.ps1"
 }
 
 variable "schedule_start_time" {
