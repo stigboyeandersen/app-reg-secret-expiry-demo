@@ -142,14 +142,21 @@ resource "azurerm_monitor_data_collection_rule" "this" {
 resource "azurerm_role_assignment" "automation_dcr_ingestion" {
   scope                = azurerm_monitor_data_collection_rule.this.id
   role_definition_name = "Monitoring Metrics Publisher"
-  principal_id         = azurerm_automation_account.this.identity[0].principal_id
+  principal_id         = azurerm_user_assigned_identity.automation.principal_id
   principal_type       = "ServicePrincipal"
 }
 
 resource "azuread_app_role_assignment" "automation_graph_application_read" {
   app_role_id         = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"
-  principal_object_id = azurerm_automation_account.this.identity[0].principal_id
+  principal_object_id = azurerm_user_assigned_identity.automation.principal_id
   resource_object_id  = data.azuread_service_principal.microsoft_graph.object_id
+}
+
+resource "azurerm_user_assigned_identity" "automation" {
+  name                = "${var.name_prefix}-automation-identity"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = var.tags
 }
 
 resource "azurerm_automation_account" "this" {
@@ -160,7 +167,8 @@ resource "azurerm_automation_account" "this" {
   local_authentication_enabled  = false
   public_network_access_enabled = true
   identity {
-    type = "SystemAssigned"
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.automation.id]
   }
   tags = var.tags
 }
@@ -200,15 +208,19 @@ resource "azurerm_automation_runbook" "this" {
     replace(
       replace(
         replace(
-          file("${path.module}/${var.runbook_path}"),
-          "__DCR_ENDPOINT__",
-          azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
+          replace(
+            file("${path.module}/${var.runbook_path}"),
+            "__DCR_ENDPOINT__",
+            azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
+          ),
+          "__DCR_IMMUTABLE_ID__",
+          azurerm_monitor_data_collection_rule.this.immutable_id
         ),
-        "__DCR_IMMUTABLE_ID__",
-        azurerm_monitor_data_collection_rule.this.immutable_id
+        "__TENANT_ID__",
+        data.azurerm_client_config.current.tenant_id
       ),
-      "__TENANT_ID__",
-      data.azurerm_client_config.current.tenant_id
+      "__MANAGED_IDENTITY_CLIENT_ID__",
+      azurerm_user_assigned_identity.automation.client_id
     ),
     "__WARNING_THRESHOLD_DAYS__",
     tostring(var.warning_threshold_days)

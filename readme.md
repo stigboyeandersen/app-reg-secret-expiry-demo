@@ -27,6 +27,12 @@ and runbook schedule. The runbook uses its Automation managed identity, obtains 
 token for Microsoft Graph and Azure Monitor Logs, queries password-credential
 metadata, and sends normalized records to the custom table.
 
+The Automation Account is configured with a **user-assigned managed identity**.
+Terraform creates that identity, attaches it to the account, grants it the
+required Microsoft Graph application permission, and assigns it
+**Monitoring Metrics Publisher** on the DCR. The runbook explicitly requests
+tokens for that identity.
+
 The exact resource names and input variable names are deployment-specific.
 Inspect `terraform/variables.tf` and `terraform/outputs.tf` for the complete list.
 
@@ -62,8 +68,9 @@ There are two distinct permission sets:
    and Microsoft.Authorization permissions appropriate to your organization.
    A constrained service principal or deployment identity is preferable to
    `Owner` in production; grant only the actions required by the Terraform plan.
-2. **Runbook Microsoft Graph permissions.** The Automation Account's system-assigned
-   managed identity needs an **application permission** that allows reading app
+2. **Runbook Microsoft Graph permissions.** The Automation Account's
+   user-assigned managed identity needs an **application permission** that allows
+   reading app
    registration credential metadata. In the Microsoft Graph API this is commonly
    `Application.Read.All` (confirm the exact permission in the implementation and
    your tenant's policy).
@@ -75,10 +82,10 @@ administrator may still need to review/grant consent in the Entra admin center
 (or use an approved equivalent administrative process) before the schedule can
 collect data.
 
-The identity that sends data must also have permission to send data through the
+The user-assigned identity that sends data must also have permission to send data through the
 DCR. Assign **Monitoring Metrics Publisher** to every managed identity or
 service principal that will call the Logs Ingestion API, normally at the DCR
-scope. The demo assigns this role to the Automation Account's system-assigned
+scope. The demo assigns this role to the Automation Account's user-assigned
 managed identity. Any additional producer identity needs its own assignment;
 having access to the DCE URL alone is not sufficient.
 
@@ -99,7 +106,7 @@ role. Do not grant write access to unrelated workspaces or subscriptions.
 
 After deployment, verify that:
 
-* the Automation Account identity exists;
+* the Automation Account has the expected user-assigned identity attached;
 * the required Microsoft Graph application permission has admin consent;
 * the identity has the DCR ingestion role; and
 * the runbook can obtain tokens without a client secret.

@@ -25,7 +25,7 @@ Pure Terraform deployment from `terraform/`; no Azure Developer CLI application 
 - Log Analytics Workspace
 - Dedicated custom Log Analytics table
 - Data Collection Endpoint and Data Collection Rule
-- Azure Automation Account with system-assigned managed identity
+- Azure Automation Account with a user-assigned managed identity
 - PowerShell runbook and daily schedule
 - DCR ingestion role assignment for the Automation identity
 
@@ -68,6 +68,9 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
 
 - OpenTofu apply completed successfully with 0 resources destroyed.
 - Resource group, workspace, custom table, DCE, DCR, Automation Account, managed identity, runbook, schedule, and DCR ingestion role were created.
+- The Automation Account uses the user-assigned identity
+  `appregexpiry-automation-identity`; its principal ID is
+  `e4c79aea-8bdc-49c0-82ec-f43f3dc63108`.
 - The Automation runbook is `Published`; the schedule runs daily in UTC.
 - The Automation identity has `Monitoring Metrics Publisher` on the DCR.
 - Microsoft Graph admin consent for the Automation identity remains a required manual tenant-administrator step before the first successful collection run.
@@ -87,3 +90,6 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
 - The earlier `403 Forbidden` was caused by the previous incorrect Graph role
   assignment; the runbook now also reports useful HTTP response details when a
   request fails after retries.
+- After migrating from system-assigned to user-assigned identity, a test job
+  completed successfully and authenticated to Graph with client ID
+  `df895be2-f648-430e-8e71-4ce7843ce57f`.

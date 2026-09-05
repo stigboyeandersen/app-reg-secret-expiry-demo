@@ -34,8 +34,18 @@ output "automation_account_name" {
 }
 
 output "automation_account_principal_id" {
-  description = "System-assigned managed identity principal ID."
-  value       = azurerm_automation_account.this.identity[0].principal_id
+  description = "User-assigned managed identity principal ID used by the Automation Account."
+  value       = azurerm_user_assigned_identity.automation.principal_id
+}
+
+output "automation_managed_identity_client_id" {
+  description = "User-assigned managed identity client ID used by the runbook."
+  value       = azurerm_user_assigned_identity.automation.client_id
+}
+
+output "automation_managed_identity_resource_id" {
+  description = "User-assigned managed identity resource ID."
+  value       = azurerm_user_assigned_identity.automation.id
 }
 
 output "runbook_name" {

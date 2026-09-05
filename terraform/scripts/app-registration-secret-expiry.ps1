@@ -6,7 +6,7 @@ param(
     [string]$DcrTableName = $(if ($env:APP_REG_SECRET_EXPIRY_DCR_TABLE_NAME) { $env:APP_REG_SECRET_EXPIRY_DCR_TABLE_NAME } else { 'AppRegistrationSecretExpiry_CL' }),
     [int]$WarningThresholdDays = $(if ($env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS) { [int]$env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS } else { [int]'__WARNING_THRESHOLD_DAYS__' }),
     [string]$TenantId = $(if ($env:APP_REG_SECRET_EXPIRY_TENANT_ID) { $env:APP_REG_SECRET_EXPIRY_TENANT_ID } else { '__TENANT_ID__' }),
-    [string]$ManagedIdentityClientId = $env:APP_REG_SECRET_EXPIRY_MANAGED_IDENTITY_CLIENT_ID,
+    [string]$ManagedIdentityClientId = $(if ($env:APP_REG_SECRET_EXPIRY_MANAGED_IDENTITY_CLIENT_ID) { $env:APP_REG_SECRET_EXPIRY_MANAGED_IDENTITY_CLIENT_ID } else { '__MANAGED_IDENTITY_CLIENT_ID__' }),
     [int]$MaxRetries = $(if ($env:APP_REG_SECRET_EXPIRY_MAX_RETRIES) { [int]$env:APP_REG_SECRET_EXPIRY_MAX_RETRIES } else { 3 }),
     [int]$RetryDelaySeconds = $(if ($env:APP_REG_SECRET_EXPIRY_RETRY_DELAY_SECONDS) { [int]$env:APP_REG_SECRET_EXPIRY_RETRY_DELAY_SECONDS } else { 2 })
 )
