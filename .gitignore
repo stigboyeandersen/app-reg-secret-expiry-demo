@@ -6,6 +6,7 @@
 tfplan
 *.tfvars
 *.tfvars.json
+.azure/validate-status.json
 
 # Secrets and local environment files
 .env
