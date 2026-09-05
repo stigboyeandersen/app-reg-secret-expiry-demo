@@ -75,9 +75,27 @@ administrator may still need to review/grant consent in the Entra admin center
 (or use an approved equivalent administrative process) before the schedule can
 collect data.
 
-The identity also needs permission to send data through the DCR (for example, the
-Azure Monitor ingestion role assigned at the DCR or destination scope). Do not
-grant write access to unrelated workspaces or subscriptions.
+The identity that sends data must also have permission to send data through the
+DCR. Assign **Monitoring Metrics Publisher** to every managed identity or
+service principal that will call the Logs Ingestion API, normally at the DCR
+scope. The demo assigns this role to the Automation Account's system-assigned
+managed identity. Any additional producer identity needs its own assignment;
+having access to the DCE URL alone is not sufficient.
+
+For example, assign the role to another producer with Azure CLI:
+
+```bash
+az role assignment create \
+  --assignee-object-id <PRODUCER_OBJECT_ID> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Monitoring Metrics Publisher" \
+  --scope <DCR_RESOURCE_ID>
+```
+
+This ingestion permission is separate from query permission. Users who only
+need to view the collected records should receive an appropriate Log Analytics
+workspace role, such as **Log Analytics Reader**, rather than the ingestion
+role. Do not grant write access to unrelated workspaces or subscriptions.
 
 After deployment, verify that:
 
