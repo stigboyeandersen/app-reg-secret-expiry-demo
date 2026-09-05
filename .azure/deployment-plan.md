@@ -1,7 +1,7 @@
 # Deployment Plan
 
 ## Status
-Validated
+Deployed
 
 ## Project
 
@@ -63,3 +63,11 @@ Pure Terraform deployment from `terraform/`; no Azure Developer CLI application 
 ## Deployment confirmation
 
 The user confirmed deployment to the selected subscription and `westeurope` on 2026-09-05.
+
+## Deployment Proof
+
+- OpenTofu apply completed successfully with 0 resources destroyed.
+- Resource group, workspace, custom table, DCE, DCR, Automation Account, managed identity, runbook, schedule, and DCR ingestion role were created.
+- The Automation runbook is `Published`; the schedule runs daily in UTC.
+- The Automation identity has `Monitoring Metrics Publisher` on the DCR.
+- Microsoft Graph admin consent for the Automation identity remains a required manual tenant-administrator step before the first successful collection run.
