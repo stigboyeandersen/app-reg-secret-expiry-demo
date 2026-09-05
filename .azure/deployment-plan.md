@@ -33,7 +33,8 @@ Pure Terraform deployment from `terraform/`; no Azure Developer CLI application 
 
 - Azure CLI authentication is active for the target subscription.
 - Terraform/OpenTofu configuration has passed formatting and validation.
-- Microsoft Graph admin consent for the Automation identity's application permission remains a post-deployment tenant-administrator step.
+- Microsoft Graph application-role assignment and admin consent are an external
+  Entra-administrator prerequisite; Terraform does not manage them.
 - Deployment is authorized by the user and may incur Azure charges.
 
 ## Validation Proof
@@ -73,10 +74,11 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
   `e4c79aea-8bdc-49c0-82ec-f43f3dc63108`.
 - The Automation runbook is `Published`; the schedule runs daily in UTC.
 - The Automation identity has `Monitoring Metrics Publisher` on the DCR.
-- The UAMI has no direct Microsoft Entra directory-role assignments; its only
-  directory permission is the Microsoft Graph `Application.Read.All`
-  application role assignment.
-- Microsoft Graph admin consent for the Automation identity remains a required manual tenant-administrator step before the first successful collection run.
+- The UAMI has no direct Microsoft Entra directory-role assignments.
+- The external Entra administrator must assign Microsoft Graph
+  `Application.Read.All` and grant consent before the first collection run.
+- The existing Graph app-role assignment was detached from Terraform state so
+  it remains externally managed; it was not revoked from the tenant.
 
 ## Diagnostics Update
 

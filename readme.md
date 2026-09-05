@@ -22,16 +22,17 @@ Azure Automation Account
                   └─ Log Analytics custom table
 ```
 
-Terraform creates the Azure resources, identity permissions, DCR, custom table,
-and runbook schedule. The runbook uses its Automation managed identity, obtains a
-token for Microsoft Graph and Azure Monitor Logs, queries password-credential
-metadata, and sends normalized records to the custom table.
+Terraform creates the Azure resources, Azure RBAC permissions, DCR, custom
+table, and runbook schedule. The runbook uses its Automation managed identity,
+obtains a token for Microsoft Graph and Azure Monitor Logs, queries
+password-credential metadata, and sends normalized records to the custom table.
 
 The Automation Account is configured with a **user-assigned managed identity**.
-Terraform creates that identity, attaches it to the account, grants it the
-required Microsoft Graph application permission, and assigns it
-**Monitoring Metrics Publisher** on the DCR. The runbook explicitly requests
-tokens for that identity.
+Terraform creates that identity, attaches it to the account, and assigns it
+**Monitoring Metrics Publisher** on the DCR. The Microsoft Graph application
+permission is intentionally assigned outside Terraform because tenant
+administrators may be separate from the Azure infrastructure deployment team.
+The runbook explicitly requests tokens for the UAMI.
 
 The identity is intentionally not assigned Microsoft Entra directory roles such
 as **Cloud Application Administrator**, **Reports Reader**, or Global
@@ -55,7 +56,9 @@ Inspect `terraform/variables.tf` and `terraform/outputs.tf` for the complete lis
   az account set --subscription <SUBSCRIPTION_ID>
   ```
 
-* A Microsoft Entra tenant where you can obtain tenant-admin consent (see below).
+* A Microsoft Entra administrator who can assign `Application.Read.All` to the
+  UAMI service principal and grant consent (see below). This can be a separate
+  person or team from the Terraform operator.
 * PowerShell 7 if you want to run or debug the runbook locally. The production
   execution is hosted by Azure Automation.
 * The Terraform CLI identity must be able to register/configure the resource
@@ -83,11 +86,38 @@ There are two distinct permission sets:
    your tenant's policy).
 
 Granting Graph application permissions requires **tenant-admin consent**.
-Terraform assigns `Application.Read.All` to the Automation managed identity when
-the deploying identity is allowed to manage Graph app-role assignments. A tenant
-administrator may still need to review/grant consent in the Entra admin center
-(or use an approved equivalent administrative process) before the schedule can
-collect data.
+Terraform does **not** assign this permission. Before the first run, an Entra
+administrator must run the following Azure CLI command after the UAMI has been
+created:
+
+```bash
+UAMI_OBJECT_ID="$(az identity show \
+  --resource-group <RESOURCE_GROUP> \
+  --name <UAMI_NAME> \
+  --query principalId -o tsv)"
+GRAPH_SP_OBJECT_ID="$(az ad sp show \
+  --id 00000003-0000-0000-c000-000000000000 \
+  --query id -o tsv)"
+APPLICATION_READ_ALL_ROLE_ID="$(az ad sp show \
+  --id 00000003-0000-0000-c000-000000000000 \
+  --query "appRoles[?value=='Application.Read.All'].id | [0]" -o tsv)"
+
+az rest --method post \
+  --url "https://graph.microsoft.com/v1.0/servicePrincipals/${UAMI_OBJECT_ID}/appRoleAssignments" \
+  --headers Content-Type=application/json \
+  --body "{\"principalId\":\"${UAMI_OBJECT_ID}\",\"resourceId\":\"${GRAPH_SP_OBJECT_ID}\",\"appRoleId\":\"${APPLICATION_READ_ALL_ROLE_ID}\"}"
+```
+
+The administrator should verify that the assignment does not already exist
+before running the command. The command creates the relationship
+`UAMI -> Microsoft Graph: Application.Read.All`; it does not assign an Entra
+directory role such as Cloud Application Administrator. Allow directory
+replication time before starting the runbook.
+
+For an existing deployment created by an earlier version of this demo, the
+Graph assignment remains in Microsoft Entra ID but is no longer managed by
+Terraform. This allows the Entra administrator to own the permission lifecycle.
+Do not remove the assignment unless the runbook should stop collecting data.
 
 The user-assigned identity that sends data must also have permission to send data through the
 DCR. Assign **Monitoring Metrics Publisher** to every managed identity or
@@ -114,7 +144,8 @@ role. Do not grant write access to unrelated workspaces or subscriptions.
 After deployment, verify that:
 
 * the Automation Account has the expected user-assigned identity attached;
-* the required Microsoft Graph application permission has admin consent;
+* the required Microsoft Graph application permission was assigned by the
+  Entra administrator and has admin consent;
 * the identity has the DCR ingestion role; and
 * the runbook can obtain tokens without a client secret.
 

@@ -10,10 +10,6 @@ locals {
 
 data "azurerm_client_config" "current" {}
 
-data "azuread_service_principal" "microsoft_graph" {
-  client_id = "00000003-0000-0000-c000-000000000000"
-}
-
 resource "azurerm_resource_group" "this" {
   name     = var.resource_group_name
   location = var.location
@@ -144,12 +140,6 @@ resource "azurerm_role_assignment" "automation_dcr_ingestion" {
   role_definition_name = "Monitoring Metrics Publisher"
   principal_id         = azurerm_user_assigned_identity.automation.principal_id
   principal_type       = "ServicePrincipal"
-}
-
-resource "azuread_app_role_assignment" "automation_graph_application_read" {
-  app_role_id         = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"
-  principal_object_id = azurerm_user_assigned_identity.automation.principal_id
-  resource_object_id  = data.azuread_service_principal.microsoft_graph.object_id
 }
 
 resource "azurerm_user_assigned_identity" "automation" {
