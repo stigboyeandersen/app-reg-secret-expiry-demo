@@ -14,5 +14,6 @@ tfplan
 
 # Editor and operating-system artifacts
 .DS_Store
+.vscode/
 *.swp
 *.swo
