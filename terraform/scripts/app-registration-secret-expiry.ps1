@@ -1,11 +1,11 @@
 [CmdletBinding()]
 param(
-    [string]$DcrEndpoint = $env:APP_REG_SECRET_EXPIRY_DCR_ENDPOINT,
-    [string]$DcrImmutableId = $env:APP_REG_SECRET_EXPIRY_DCR_IMMUTABLE_ID,
+    [string]$DcrEndpoint = $(if ($env:APP_REG_SECRET_EXPIRY_DCR_ENDPOINT) { $env:APP_REG_SECRET_EXPIRY_DCR_ENDPOINT } else { '__DCR_ENDPOINT__' }),
+    [string]$DcrImmutableId = $(if ($env:APP_REG_SECRET_EXPIRY_DCR_IMMUTABLE_ID) { $env:APP_REG_SECRET_EXPIRY_DCR_IMMUTABLE_ID } else { '__DCR_IMMUTABLE_ID__' }),
     [string]$DcrStreamName = $(if ($env:APP_REG_SECRET_EXPIRY_DCR_STREAM_NAME) { $env:APP_REG_SECRET_EXPIRY_DCR_STREAM_NAME } else { 'Custom-AppRegistrationSecretExpiry_CL' }),
     [string]$DcrTableName = $(if ($env:APP_REG_SECRET_EXPIRY_DCR_TABLE_NAME) { $env:APP_REG_SECRET_EXPIRY_DCR_TABLE_NAME } else { 'AppRegistrationSecretExpiry_CL' }),
-    [int]$WarningThresholdDays = $(if ($env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS) { [int]$env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS } else { 30 }),
-    [string]$TenantId = $env:APP_REG_SECRET_EXPIRY_TENANT_ID,
+    [int]$WarningThresholdDays = $(if ($env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS) { [int]$env:APP_REG_SECRET_EXPIRY_WARNING_THRESHOLD_DAYS } else { [int]'__WARNING_THRESHOLD_DAYS__' }),
+    [string]$TenantId = $(if ($env:APP_REG_SECRET_EXPIRY_TENANT_ID) { $env:APP_REG_SECRET_EXPIRY_TENANT_ID } else { '__TENANT_ID__' }),
     [string]$ManagedIdentityClientId = $env:APP_REG_SECRET_EXPIRY_MANAGED_IDENTITY_CLIENT_ID,
     [int]$MaxRetries = $(if ($env:APP_REG_SECRET_EXPIRY_MAX_RETRIES) { [int]$env:APP_REG_SECRET_EXPIRY_MAX_RETRIES } else { 3 }),
     [int]$RetryDelaySeconds = $(if ($env:APP_REG_SECRET_EXPIRY_RETRY_DELAY_SECONDS) { [int]$env:APP_REG_SECRET_EXPIRY_RETRY_DELAY_SECONDS } else { 2 })
@@ -46,6 +46,25 @@ function Get-ManagedIdentityToken {
     [string]$response.access_token
 }
 
+function Write-TokenDiagnostics {
+    param([string]$Token)
+    $parts = $Token.Split('.')
+    if ($parts.Count -lt 2) {
+        Write-Warning 'Managed identity token did not have a readable JWT payload.'
+        return
+    }
+    try {
+        $payload = $parts[1].Replace('-', '+').Replace('_', '/')
+        $payload += '=' * ((4 - ($payload.Length % 4)) % 4)
+        $claims = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($payload)) | ConvertFrom-Json
+        Write-Verbose ("Token diagnostics: aud={0}; appid={1}; tid={2}; roles={3}" -f `
+            $claims.aud, $claims.appid, $claims.tid, (@($claims.roles) -join ','))
+    }
+    catch {
+        Write-Warning ("Unable to decode managed identity token diagnostics: {0}" -f $_.Exception.Message)
+    }
+}
+
 function Invoke-WithRetry {
     param([scriptblock]$Operation, [string]$Description)
     $attempt = 0
@@ -53,7 +72,23 @@ function Invoke-WithRetry {
         try { return & $Operation }
         catch {
             $attempt++
-            if ($attempt -gt $MaxRetries) { throw "$Description failed after $MaxRetries retries: $($_.Exception.Message)" }
+            if ($attempt -gt $MaxRetries) {
+                $details = ''
+                if ($_.Exception.Response) {
+                    try {
+                        $reader = [IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
+                        $details = $reader.ReadToEnd()
+                        $reader.Dispose()
+                    }
+                    catch {
+                        $details = 'Unable to read HTTP error response.'
+                    }
+                }
+                if ([string]::IsNullOrWhiteSpace($details)) {
+                    throw "$Description failed after $MaxRetries retries: $($_.Exception.Message)"
+                }
+                throw "$Description failed after $MaxRetries retries: $($_.Exception.Message) Response: $details"
+            }
             $delay = [Math]::Min(60, [Math]::Max(1, $RetryDelaySeconds) * [Math]::Pow(2, $attempt - 1))
             Write-Warning "$Description failed; retrying in $delay seconds: $($_.Exception.Message)"
             Start-Sleep -Seconds $delay
@@ -71,7 +106,8 @@ function Get-GraphApplications {
             Invoke-RestMethod -Method Get -Uri $uri -Headers $headers -ContentType 'application/json'
         }
         if ($null -ne $page.value) { $applications += @($page.value) }
-        $uri = [string]$page.'@odata.nextLink'
+        $nextLink = $page.PSObject.Properties['@odata.nextLink']
+        $uri = if ($null -ne $nextLink) { [string]$nextLink.Value } else { '' }
     }
     $applications
 }
@@ -85,6 +121,7 @@ $TenantId = Get-RequiredValue 'TenantId' $TenantId
 
 try {
     $graphToken = Get-ManagedIdentityToken 'https://graph.microsoft.com/' $ManagedIdentityClientId
+    Write-TokenDiagnostics $graphToken
     $applications = Get-GraphApplications $graphToken
     $nowUtc = [DateTime]::UtcNow
     $records = foreach ($application in $applications) {

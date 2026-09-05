@@ -10,6 +10,10 @@ locals {
 
 data "azurerm_client_config" "current" {}
 
+data "azuread_service_principal" "microsoft_graph" {
+  client_id = "00000003-0000-0000-c000-000000000000"
+}
+
 resource "azurerm_resource_group" "this" {
   name     = var.resource_group_name
   location = var.location
@@ -142,6 +146,12 @@ resource "azurerm_role_assignment" "automation_dcr_ingestion" {
   principal_type       = "ServicePrincipal"
 }
 
+resource "azuread_app_role_assignment" "automation_graph_application_read" {
+  app_role_id         = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"
+  principal_object_id = azurerm_automation_account.this.identity[0].principal_id
+  resource_object_id  = data.azuread_service_principal.microsoft_graph.object_id
+}
+
 resource "azurerm_automation_account" "this" {
   name                          = "${var.name_prefix}-aa"
   location                      = azurerm_resource_group.this.location
@@ -186,7 +196,23 @@ resource "azurerm_automation_runbook" "this" {
   log_progress            = true
   log_verbose             = true
   description             = "Collects Entra app registration credential expiry data and sends it through the Logs Ingestion API."
-  content                 = file("${path.module}/${var.runbook_path}")
+  content = replace(
+    replace(
+      replace(
+        replace(
+          file("${path.module}/${var.runbook_path}"),
+          "__DCR_ENDPOINT__",
+          azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
+        ),
+        "__DCR_IMMUTABLE_ID__",
+        azurerm_monitor_data_collection_rule.this.immutable_id
+      ),
+      "__TENANT_ID__",
+      data.azurerm_client_config.current.tenant_id
+    ),
+    "__WARNING_THRESHOLD_DAYS__",
+    tostring(var.warning_threshold_days)
+  )
 
   publish_content_link {
     uri = var.runbook_publish_uri
@@ -215,12 +241,4 @@ resource "azurerm_automation_job_schedule" "daily_runbook" {
   automation_account_name = azurerm_automation_account.this.name
   runbook_name            = azurerm_automation_runbook.this.name
   schedule_name           = azurerm_automation_schedule.daily.name
-  parameters = {
-    dcrendpoint          = azurerm_monitor_data_collection_endpoint.this.logs_ingestion_endpoint
-    dcrimmutableid       = azurerm_monitor_data_collection_rule.this.immutable_id
-    dcrstreamname        = local.stream_name
-    dcrtablename         = local.table_name
-    tenantid             = data.azurerm_client_config.current.tenant_id
-    warningthresholddays = tostring(var.warning_threshold_days)
-  }
 }

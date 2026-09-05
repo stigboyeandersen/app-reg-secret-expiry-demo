@@ -68,11 +68,12 @@ There are two distinct permission sets:
    `Application.Read.All` (confirm the exact permission in the implementation and
    your tenant's policy).
 
-Granting Graph application permissions requires **manual tenant-admin consent**.
-Terraform can create the identity and may configure the permission object, but it
-does not replace the human approval step in every tenant. A tenant administrator
-must review and grant consent in the Entra admin center (or use an approved,
-equivalent administrative process) before the schedule can collect data.
+Granting Graph application permissions requires **tenant-admin consent**.
+Terraform assigns `Application.Read.All` to the Automation managed identity when
+the deploying identity is allowed to manage Graph app-role assignments. A tenant
+administrator may still need to review/grant consent in the Entra admin center
+(or use an approved equivalent administrative process) before the schedule can
+collect data.
 
 The identity also needs permission to send data through the DCR (for example, the
 Azure Monitor ingestion role assigned at the DCR or destination scope). Do not
@@ -84,6 +85,11 @@ After deployment, verify that:
 * the required Microsoft Graph application permission has admin consent;
 * the identity has the DCR ingestion role; and
 * the runbook can obtain tokens without a client secret.
+
+The scheduled job receives its DCR endpoint, DCR immutable ID, tenant ID, and
+warning threshold through Terraform-rendered runbook defaults. This avoids an
+Azure Automation API limitation where scheduled job parameter maps can be
+dropped. You can still override these values when starting a one-off job.
 
 ## Deploy with Terraform
 
@@ -141,7 +147,9 @@ disable credentials.
 The Automation Account diagnostic setting sends `JobLogs`, `JobStreams`,
 `AuditEvent`, and `AllMetrics` to the same Log Analytics Workspace. This provides
 the execution evidence needed to confirm that scheduled jobs start, finish, and
-report errors.
+report errors. Graph application-role assignments can take a short time to
+propagate after deployment; if the first run returns `403 Forbidden`, wait and
+retry after confirming that the managed identity has `Application.Read.All`.
 
 Certificates are **out of scope**. This demo does not inventory certificate
 credentials, validate certificate chains, or alert on certificate expiration.
@@ -245,6 +253,9 @@ Verify in this order:
 6. Confirm a second run produces a newer `TimeGenerated` observation.
 7. Test an intentionally unauthorized identity only in a non-production tenant
    if you need to validate failure handling; do not weaken production permissions.
+
+The deployed demo was verified with a successful run that submitted two
+password-credential records to `AppRegistrationSecretExpiry_CL`.
 
 ## Cleanup
 

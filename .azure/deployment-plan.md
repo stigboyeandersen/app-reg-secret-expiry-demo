@@ -77,7 +77,13 @@ The user confirmed deployment to the selected subscription and `westeurope` on 2
 - Automation diagnostic setting: `appregexpiry-automation-diagnostics`
 - Destination: `appregexpiry-law`
 - Enabled categories: `JobLogs`, `JobStreams`, `AuditEvent`, and `AllMetrics`
-- A test job reached `Running` and then failed with the expected `403 Forbidden`
-  from Microsoft Graph because tenant-admin consent has not yet been granted.
-- The managed identity token acquisition path is working; the remaining blocker
-  is Graph application permission/admin consent.
+- The Automation identity has the Microsoft Graph `Application.Read.All`
+  application role assignment.
+- A post-fix test job completed successfully after the Graph permission
+  assignment propagated. The job found two password credentials and submitted
+  them to the Logs Ingestion API.
+- The managed identity token contained the expected `Application.Read.All`
+  role, and the custom table subsequently contained the two records.
+- The earlier `403 Forbidden` was caused by the previous incorrect Graph role
+  assignment; the runbook now also reports useful HTTP response details when a
+  request fails after retries.
